@@ -1009,6 +1009,53 @@ WHERE
     def test_identify_lambda(self):
         self.validate("x(y -> y)", 'X("y" -> "y")', identify=True)
 
+    def test_presto_postgres_empty_json_path_key(self):
+        for source, postgres_target in (
+            ("SELECT JSON_EXTRACT(x, '$[\"\"]')", "SELECT JSON_EXTRACT_PATH(x, '')"),
+            (
+                "SELECT JSON_EXTRACT_SCALAR(x, '$[\"\"]')",
+                "SELECT JSON_EXTRACT_PATH_TEXT(x, '')",
+            ),
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(
+                    transpile(source, read="presto", write="postgres")[0],
+                    postgres_target,
+                )
+
+                regenerated = transpile(
+                    postgres_target, read="postgres", write="postgres"
+                )[0]
+                self.assertEqual(regenerated, postgres_target)
+                self.assertEqual(
+                    transpile(regenerated, read="postgres", write="postgres")[0],
+                    postgres_target,
+                )
+                self.assertEqual(
+                    parse_one(regenerated, read="postgres"),
+                    parse_one(postgres_target, read="postgres"),
+                )
+                self.assertEqual(
+                    transpile(regenerated, read="postgres", write="presto")[0],
+                    transpile(source, read="presto", write="presto")[0],
+                )
+                self.assertEqual(
+                    transpile(
+                        transpile(postgres_target, read="postgres", write="presto")[0],
+                        read="presto",
+                        write="postgres",
+                    )[0],
+                    postgres_target,
+                )
+                self.assertEqual(
+                    transpile(
+                        transpile(postgres_target, read="postgres", write="trino")[0],
+                        read="trino",
+                        write="postgres",
+                    )[0],
+                    postgres_target,
+                )
+
     def test_identity(self):
         self.assertEqual(transpile("")[0], "")
         for sql in load_sql_fixtures("identity.sql"):

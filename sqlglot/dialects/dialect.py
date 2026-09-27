@@ -2286,7 +2286,9 @@ def json_extract_segments(
         segments = []
         for segment in path.expressions:
             path = self.sql(segment)
-            if path:
+            if path or (
+                isinstance(segment, exp.JSONPathKey) and isinstance(segment.this, str)
+            ):
                 if isinstance(segment, exp.JSONPathPart) and (
                     quoted_index or not isinstance(segment, exp.JSONPathSubscript)
                 ):
